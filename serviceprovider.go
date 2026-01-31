@@ -484,8 +484,10 @@ func getConnState(conn net.Conn) (cs ConnectionState) {
 	tlsConn, ok := conn.(*tls.Conn)
 	if ok {
 		cs.TLS = tlsConn.ConnectionState()
-		cs.RawConn = conn
 	}
+
+	cs.RawConn = conn
+
 	return
 }
 
