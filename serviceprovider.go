@@ -387,7 +387,8 @@ type CMoveCallback func(
 type ConnectionState struct {
 	// TLS connection state. It is nonempty only when the connection is set up
 	// over TLS.
-	TLS tls.ConnectionState
+	TLS     tls.ConnectionState
+	RawConn *net.Conn
 }
 
 // CEchoCallback implements C-ECHO callback. It typically just returns
@@ -483,6 +484,7 @@ func getConnState(conn net.Conn) (cs ConnectionState) {
 	tlsConn, ok := conn.(*tls.Conn)
 	if ok {
 		cs.TLS = tlsConn.ConnectionState()
+		cs.RawConn = &conn
 	}
 	return
 }
