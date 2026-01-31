@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/mlibanori/go-netdicom/pdu/pdu_item"
+	"github.com/giesekow/go-netdicom/pdu/pdu_item"
 	"github.com/suyashkumar/dicom/pkg/dicomio"
 )
 

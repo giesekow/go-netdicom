@@ -4,7 +4,7 @@ package dimse
 import (
 	"fmt"
 
-	"github.com/mlibanori/go-netdicom/commandset"
+	"github.com/giesekow/go-netdicom/commandset"
 	"github.com/suyashkumar/dicom"
 )
 

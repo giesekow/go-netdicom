@@ -5,10 +5,10 @@ import (
 	"log"
 	"net"
 
+	"github.com/giesekow/go-netdicom"
+	"github.com/giesekow/go-netdicom/dimse"
+	"github.com/giesekow/go-netdicom/sopclass"
 	"github.com/grailbio/go-dicom"
-	"github.com/mlibanori/go-netdicom"
-	"github.com/mlibanori/go-netdicom/dimse"
-	"github.com/mlibanori/go-netdicom/sopclass"
 )
 
 func startServer(faults netdicom.FaultInjector) net.Listener {

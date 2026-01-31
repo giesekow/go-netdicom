@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/mlibanori/go-netdicom/commandset"
+	"github.com/giesekow/go-netdicom/commandset"
 	"github.com/suyashkumar/dicom"
 	dicomtag "github.com/suyashkumar/dicom/pkg/tag"
 )

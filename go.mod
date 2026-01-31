@@ -1,4 +1,4 @@
-module github.com/mlibanori/go-netdicom
+module github.com/giesekow/go-netdicom
 
 go 1.24.1
 

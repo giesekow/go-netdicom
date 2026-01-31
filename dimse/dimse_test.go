@@ -5,7 +5,7 @@ package dimse_test
 // 	"testing"
 
 // 	"github.com/grailbio/go-dicom/dicomio"
-// 	"github.com/mlibanori/go-netdicom/dimse/dimse_commands"
+// 	"github.com/giesekow/go-netdicom/dimse/dimse_commands"
 // )
 
 // func testDIMSE(t *testing.T, v Message) {
