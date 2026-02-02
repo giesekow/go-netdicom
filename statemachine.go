@@ -236,9 +236,12 @@ otherwise issue A-ASSOCIATE-RJ-PDU and start ARTIM timer`,
 var actionAe7 = &stateAction{"AE-7", "Send A-ASSOCIATE-AC PDU",
 	func(sm *stateMachine, event stateEvent) stateType {
 		sendPDU(sm, event.pdu.(*pdu.AAssociateAC))
+		assPdu := event.pdu.(*pdu.AAssociateAC)
 		sm.upcallCh <- upcallEvent{
-			eventType: upcallEventHandshakeCompleted,
-			cm:        sm.contextManager,
+			eventType:      upcallEventHandshakeCompleted,
+			cm:             sm.contextManager,
+			CalledAETitle:  assPdu.CalledAETitle,
+			CallingAETitle: assPdu.CallingAETitle,
 		}
 		return sta06
 	}}
@@ -509,6 +512,9 @@ type upcallEvent struct {
 	// The context of the request. It can be mapped backto <abstract syntax, transfer syntax> by consulting the
 	// context manager. Set only in upcallEventData event.
 	contextID byte
+
+	CalledAETitle  string
+	CallingAETitle string
 
 	command dimse.Message
 	data    []byte

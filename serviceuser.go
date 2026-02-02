@@ -431,7 +431,7 @@ func (su *ServiceUser) CGet(qrLevel QRLevel, filter []*dicom.Element,
 	}
 	defer su.disp.deleteCommand(cs)
 
-	handleCStore := func(msg dimse.Message, data []byte, cs *serviceCommandState) {
+	handleCStore := func(msg dimse.Message, data []byte, cs *serviceCommandState, aInfo associationInfo) {
 		c := msg.(*dimse.CStoreRq)
 		status := cb(
 			context.transferSyntaxUID,

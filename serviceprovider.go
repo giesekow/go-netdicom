@@ -47,6 +47,17 @@ func handleCStore(
 	cs.sendMessage(resp, nil)
 }
 
+func handleAssocRQ(
+	params ServiceProviderParams,
+	connState ConnectionState) {
+	if params.AssocRQ != nil {
+		status := params.AssocRQ(connState)
+		if status != dimse.Success {
+			connState.RawConn.Close()
+		}
+	}
+}
+
 func handleCFind(
 	params ServiceProviderParams,
 	connState ConnectionState,
@@ -298,6 +309,10 @@ type ServiceProviderParams struct {
 	// map should be nonempty iff the server supports CMove.
 	RemoteAEs map[string]string
 
+	// Called on Assoc RQ request. If nil, a C-ECHO call will produce an error response.
+	//
+	AssocRQ AssocReQCallback
+
 	// Called on C_ECHO request. If nil, a C-ECHO call will produce an error response.
 	//
 	// TODO(saito) Support a default C-ECHO callback?
@@ -387,13 +402,18 @@ type CMoveCallback func(
 type ConnectionState struct {
 	// TLS connection state. It is nonempty only when the connection is set up
 	// over TLS.
-	TLS     tls.ConnectionState
-	RawConn net.Conn
+	TLS            tls.ConnectionState
+	RawConn        net.Conn
+	CalledAETitle  string
+	CallingAETitle string
+	RemoteAddr     string
 }
 
 // CEchoCallback implements C-ECHO callback. It typically just returns
 // dimse.Success.
 type CEchoCallback func(conn ConnectionState) dimse.Status
+
+type AssocReQCallback func(conn ConnectionState) dimse.Status
 
 // ServiceProvider encapsulates the state for DICOM server (provider).
 type ServiceProvider struct {
@@ -480,13 +500,16 @@ func NewServiceProvider(params ServiceProviderParams, port string) (*ServiceProv
 	return sp, nil
 }
 
-func getConnState(conn net.Conn) (cs ConnectionState) {
+func getConnState(conn net.Conn, aInfo associationInfo) (cs ConnectionState) {
 	tlsConn, ok := conn.(*tls.Conn)
 	if ok {
 		cs.TLS = tlsConn.ConnectionState()
 	}
 
 	cs.RawConn = conn
+	cs.CalledAETitle = aInfo.CalledAETitle
+	cs.CallingAETitle = aInfo.CallingAETitle
+	cs.RemoteAddr = conn.RemoteAddr().String()
 
 	return
 }
@@ -497,28 +520,42 @@ func RunProviderForConn(conn net.Conn, params ServiceProviderParams) {
 	upcallCh := make(chan upcallEvent, 128)
 	label := newUID("sc")
 	disp := newServiceDispatcher(label)
+	assocInfo := associationInfo{}
+	disp.registerCallback(dimse.CommandFieldAssocRq,
+		func(msg dimse.Message, data []byte, cs *serviceCommandState, aInfo associationInfo) {
+			handleAssocRQ(params, getConnState(conn, aInfo))
+		})
 	disp.registerCallback(dimse.CommandFieldCStoreRq,
-		func(msg dimse.Message, data []byte, cs *serviceCommandState) {
-			handleCStore(params.CStore, getConnState(conn), msg.(*dimse.CStoreRq), data, cs)
+		func(msg dimse.Message, data []byte, cs *serviceCommandState, aInfo associationInfo) {
+			handleCStore(params.CStore, getConnState(conn, aInfo), msg.(*dimse.CStoreRq), data, cs)
 		})
 	disp.registerCallback(dimse.CommandFieldCFindRq,
-		func(msg dimse.Message, data []byte, cs *serviceCommandState) {
-			handleCFind(params, getConnState(conn), msg.(*dimse.CFindRq), data, cs)
+		func(msg dimse.Message, data []byte, cs *serviceCommandState, aInfo associationInfo) {
+			handleCFind(params, getConnState(conn, aInfo), msg.(*dimse.CFindRq), data, cs)
 		})
 	disp.registerCallback(dimse.CommandFieldCMoveRq,
-		func(msg dimse.Message, data []byte, cs *serviceCommandState) {
-			handleCMove(params, getConnState(conn), msg.(*dimse.CMoveRq), data, cs)
+		func(msg dimse.Message, data []byte, cs *serviceCommandState, aInfo associationInfo) {
+			handleCMove(params, getConnState(conn, aInfo), msg.(*dimse.CMoveRq), data, cs)
 		})
 	disp.registerCallback(dimse.CommandFieldCGetRq,
-		func(msg dimse.Message, data []byte, cs *serviceCommandState) {
-			handleCGet(params, getConnState(conn), msg.(*dimse.CGetRq), data, cs)
+		func(msg dimse.Message, data []byte, cs *serviceCommandState, aInfo associationInfo) {
+			handleCGet(params, getConnState(conn, aInfo), msg.(*dimse.CGetRq), data, cs)
 		})
 	disp.registerCallback(dimse.CommandFieldCEchoRq,
-		func(msg dimse.Message, data []byte, cs *serviceCommandState) {
-			handleCEcho(params, getConnState(conn), msg.(*dimse.CEchoRq), data, cs)
+		func(msg dimse.Message, data []byte, cs *serviceCommandState, aInfo associationInfo) {
+			handleCEcho(params, getConnState(conn, aInfo), msg.(*dimse.CEchoRq), data, cs)
 		})
 	go runStateMachineForServiceProvider(conn, upcallCh, disp.downcallCh, label)
 	for event := range upcallCh {
+		if event.eventType == upcallEventHandshakeCompleted {
+			// Copy assoc info from event
+			assocInfo.CalledAETitle = event.CalledAETitle
+			assocInfo.CallingAETitle = event.CallingAETitle
+		} else {
+			// Write Assoc info to event
+			event.CalledAETitle = assocInfo.CalledAETitle
+			event.CallingAETitle = assocInfo.CallingAETitle
+		}
 		disp.handleEvent(event)
 	}
 	dicomlog.Vprintf(0, "dicom.serviceProvider(%s): Finished connection %p (remote: %+v)", label, conn, conn.RemoteAddr())

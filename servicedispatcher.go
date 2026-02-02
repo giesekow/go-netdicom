@@ -28,7 +28,12 @@ type serviceDispatcher struct {
 	lastMessageID dimse.MessageID
 }
 
-type serviceCallback func(msg dimse.Message, data []byte, cs *serviceCommandState)
+type associationInfo struct {
+	CallingAETitle string
+	CalledAETitle  string
+}
+
+type serviceCallback func(msg dimse.Message, data []byte, cs *serviceCommandState, aInfo associationInfo)
 
 // Per-DIMSE-command state.
 type serviceCommandState struct {
@@ -133,6 +138,15 @@ func (disp *serviceDispatcher) unregisterCallback(commandField uint16) {
 
 func (disp *serviceDispatcher) handleEvent(event upcallEvent) {
 	if event.eventType == upcallEventHandshakeCompleted {
+		cb := disp.callbacks[dimse.CommandFieldAssocRq]
+		go func() {
+			cb(
+				event.command,
+				event.data,
+				nil,
+				associationInfo{CallingAETitle: event.CallingAETitle, CalledAETitle: event.CalledAETitle},
+			)
+		}()
 		return
 	}
 	doassert(event.eventType == upcallEventData)
@@ -155,7 +169,12 @@ func (disp *serviceDispatcher) handleEvent(event upcallEvent) {
 	cb := disp.callbacks[event.command.CommandField()]
 	disp.mu.Unlock()
 	go func() {
-		cb(event.command, event.data, dc)
+		cb(
+			event.command,
+			event.data,
+			dc,
+			associationInfo{CallingAETitle: event.CallingAETitle, CalledAETitle: event.CalledAETitle},
+		)
 		disp.deleteCommand(dc)
 	}()
 }

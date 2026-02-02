@@ -27,6 +27,7 @@ type Message interface {
 }
 
 const (
+	CommandFieldAssocRq   uint16 = 0x0000 // Here only for assoc request response
 	CommandFieldCStoreRq  uint16 = 0x0001
 	CommandFieldCStoreRsp uint16 = 0x8001
 	CommandFieldCFindRq   uint16 = 0x0020
